@@ -80,29 +80,44 @@ function getPermutations(arr) {
     return res;
 }
 
-// Исправленная функция преобразования в синтаксис JavaScript
+// Преобразование выражения с учётом правильного приоритета импликации и эквиваленции
 function prepareJSExpression(text) {
-    return text
-        .replace(/≡/g, '===')               // эквивалентность
-        .replace(/→/g, '<=')                // импликация (<= работает как !a || b для 0/1)
-        .replace(/∨/g, ' || ')              // ИЛИ
-        .replace(/∧/g, ' && ')              // И
-        .replace(/¬\s*([a-zA-Z0-9_]+|\([^)]+\))/g, '!($1)'); // НЕ
+    let expr = text
+        .replace(/≡/g, '===')
+        .replace(/∨/g, ' || ')
+        .replace(/∧/g, ' && ')
+        .replace(/¬\s*([a-zA-Z0-9_]+|\([^)]+\))/g, '!($1)');
+
+    // Замена импликации A → B на (!A || B) с разбором скобок
+    while (expr.includes('→')) {
+        expr = expr.replace(/([a-zA-Z0-9_!=()]+)\s*→\s*([a-zA-Z0-9_!=()]+)/g, '(!($1) || ($2))');
+    }
+    return expr;
 }
 
 function solve() {
     let rawExpr = document.getElementById('expr').value;
-    const exprText = prepareJSExpression(rawExpr);   // теперь это валидный JS
+    const exprText = prepareJSExpression(rawExpr);
     const varNames = document.getElementById('vars').value.trim().split(/\s+/);
     const inputs = document.querySelectorAll('#grid input');
     
     let targetRows = [];
     for (let i = 0; i < 3; i++) {
         let row = [];
+        let isEmpty = true;
         for (let j = 0; j < 5; j++) {
-            row.push(inputs[i * 5 + j].value.trim());
+            let val = inputs[i * 5 + j].value.trim();
+            row.push(val);
+            if (val !== '-') isEmpty = false;
         }
-        targetRows.push(row);
+        if (!isEmpty) {
+            targetRows.push(row);
+        }
+    }
+
+    if (targetRows.length === 0) {
+        document.getElementById('result').innerText = "Заполните хотя бы одно значение в таблице!";
+        return;
     }
 
     const n = varNames.length;
@@ -131,16 +146,16 @@ function solve() {
     const perms = getPermutations(varNames);
     let answers = [];
 
+    // Поиск совпадений через рекурсивный перебор всех комбинаций строк (без жадного застревания)
     for (let p of perms) {
-        let matchedIndices = new Set();
-        let validPerm = true;
+        function matchRows(tIdx, usedFullIndices) {
+            if (tIdx === targetRows.length) return true;
+            let tRow = targetRows[tIdx];
 
-        for (let tRow of targetRows) {
-            let foundMatch = false;
             for (let idx = 0; idx < fullTable.length; idx++) {
-                if (matchedIndices.has(idx)) continue;
+                if (usedFullIndices.has(idx)) continue;
                 let ftRow = fullTable[idx];
-                
+
                 if (tRow[4] !== '-' && parseInt(tRow[4]) !== ftRow.F) continue;
 
                 let colMatch = true;
@@ -152,18 +167,15 @@ function solve() {
                 }
 
                 if (colMatch) {
-                    foundMatch = true;
-                    matchedIndices.add(idx);
-                    break;
+                    usedFullIndices.add(idx);
+                    if (matchRows(tIdx + 1, usedFullIndices)) return true;
+                    usedFullIndices.delete(idx); // откат при неудаче
                 }
             }
-            if (!foundMatch) {
-                validPerm = false;
-                break;
-            }
+            return false;
         }
 
-        if (validPerm) {
+        if (matchRows(0, new Set())) {
             answers.push(p.join(''));
         }
     }
