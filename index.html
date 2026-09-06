@@ -80,18 +80,19 @@ function getPermutations(arr) {
     return res;
 }
 
-function preparePythonExpression(text) {
+// Исправленная функция преобразования в синтаксис JavaScript
+function prepareJSExpression(text) {
     return text
-        .replace(/≡/g, '==')
-        .replace(/→/g, '<=')
-        .replace(/∨/g, ' or ')
-        .replace(/∧/g, ' and ')
-        .replace(/¬\s*([a-zA-Z0-9_]+|\([^)]+\))/g, '(not ($1))');
+        .replace(/≡/g, '===')               // эквивалентность
+        .replace(/→/g, '<=')                // импликация (<= работает как !a || b для 0/1)
+        .replace(/∨/g, ' || ')              // ИЛИ
+        .replace(/∧/g, ' && ')              // И
+        .replace(/¬\s*([a-zA-Z0-9_]+|\([^)]+\))/g, '!($1)'); // НЕ
 }
 
 function solve() {
     let rawExpr = document.getElementById('expr').value;
-    const exprText = preparePythonExpression(rawExpr);
+    const exprText = prepareJSExpression(rawExpr);   // теперь это валидный JS
     const varNames = document.getElementById('vars').value.trim().split(/\s+/);
     const inputs = document.querySelectorAll('#grid input');
     
