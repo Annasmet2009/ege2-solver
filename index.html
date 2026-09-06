@@ -44,7 +44,7 @@
     <label>Таблица из задания (0, 1 или -):</label>
     <div class="grid" id="grid">
         <div class="grid-header">C1</div><div class="grid-header">C2</div><div class="grid-header">C3</div><div class="grid-header">C4</div><div class="grid-header">F</div>
-        <!-- Заполненная таблица для примера -->
+        <!-- Строки для вашего примера -->
         <input value="0"><input value="-"><input value="0"><input value="-"><input value="0">
         <input value="0"><input value="0"><input value="-"><input value="-"><input value="0">
         <input value="0"><input value="-"><input value="-"><input value="0"><input value="0">
@@ -80,31 +80,82 @@ function getPermutations(arr) {
     return res;
 }
 
-// Преобразователь логических операций в эквивалентный JS-код с соблюдением приоритетов
-function prepareJSExpression(text) {
-    let s = text.replace(/\s+/g, '');
-    
-    // Эквиваленция (A === B)
-    while (s.includes('≡')) {
-        s = s.replace(/([^()≡∨∧→¬]+|\([^()]*\))≡([^()≡∨∧→¬]+|\([^()]*\))/g, '(($1)===($2))');
+// Надежный парсер логических выражений с верными приоритетами: ¬ -> ∧ -> ∨ -> → -> ≡
+function evaluateExpression(exprStr, values) {
+    let tokens = exprStr.replace(/\s+/g, '')
+        .replace(/≡/g, '=')
+        .replace(/→/g, '>')
+        .replace(/∨/g, '|')
+        .replace(/∧/g, '&')
+        .replace(/¬/g, '!')
+        .match(/([a-zA-Z0-9_]+|!|=|&|\||>|\(|\))/g) || [];
+
+    let pos = 0;
+
+    function parseEquiv() {
+        let left = parseImpl();
+        while (pos < tokens.length && tokens[pos] === '=') {
+            pos++;
+            let right = parseImpl();
+            left = (left === right) ? 1 : 0;
+        }
+        return left;
     }
-    // Импликация (!A || B)
-    while (s.includes('→')) {
-        s = s.replace(/([^()→∨∧¬]+|\([^()]*\))→([^()→∨∧¬]+|\([^()]*\))/g, '(!($1)||($2))');
+
+    function parseImpl() {
+        let left = parseOr();
+        if (pos < tokens.length && tokens[pos] === '>') {
+            pos++;
+            let right = parseImpl(); // Правая ассоциативность для импликации
+            left = (!left || right) ? 1 : 0;
+        }
+        return left;
     }
-    // ИЛИ (A || B)
-    s = s.replace(/∨/g, '||');
-    // И (A && B)
-    s = s.replace(/∧/g, '&&');
-    // НЕ (!A)
-    s = s.replace(/¬/g, '!');
-    
-    return s;
+
+    function parseOr() {
+        let left = parseAnd();
+        while (pos < tokens.length && tokens[pos] === '|') {
+            pos++;
+            let right = parseAnd();
+            left = (left || right) ? 1 : 0;
+        }
+        return left;
+    }
+
+    function parseAnd() {
+        let left = parseNot();
+        while (pos < tokens.length && tokens[pos] === '&') {
+            pos++;
+            let right = parseNot();
+            left = (left && right) ? 1 : 0;
+        }
+        return left;
+    }
+
+    function parseNot() {
+        if (pos < tokens.length && tokens[pos] === '!') {
+            pos++;
+            let val = parseNot();
+            return val ? 0 : 1;
+        }
+        return parsePrimary();
+    }
+
+    function parsePrimary() {
+        let token = tokens[pos++];
+        if (token === '(') {
+            let val = parseEquiv();
+            pos++; // Пропускаем ')'
+            return val;
+        }
+        return values[token] !== undefined ? values[token] : 0;
+    }
+
+    return parseEquiv();
 }
 
 function solve() {
     let rawExpr = document.getElementById('expr').value;
-    const exprText = prepareJSExpression(rawExpr);
     const varNames = document.getElementById('vars').value.trim().split(/\s+/);
     const inputs = document.querySelectorAll('#grid input');
     
@@ -129,8 +180,6 @@ function solve() {
 
     const n = varNames.length;
     let fullTable = [];
-    
-    const sortedVars = [...varNames].sort((a, b) => b.length - a.length);
 
     for (let i = 0; i < (1 << n); i++) {
         let env = {};
@@ -138,11 +187,7 @@ function solve() {
             env[varNames[j]] = (i >> (n - 1 - j)) & 1;
         }
         try {
-            let evalExpr = exprText;
-            for (let v of sortedVars) {
-                evalExpr = evalExpr.replace(new RegExp('\\b' + v + '\\b', 'g'), env[v]);
-            }
-            let fVal = eval(evalExpr) ? 1 : 0;
+            let fVal = evaluateExpression(rawExpr, env);
             fullTable.push({...env, F: fVal});
         } catch (e) {
             document.getElementById('result').innerText = "Ошибка в синтаксисе выражения!";
@@ -153,7 +198,6 @@ function solve() {
     const perms = getPermutations(varNames);
     let answers = [];
 
-    // Подбор строк
     for (let p of perms) {
         function matchRows(tIdx, usedFullIndices) {
             if (tIdx === targetRows.length) return true;
