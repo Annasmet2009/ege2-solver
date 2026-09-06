@@ -86,7 +86,7 @@ function preparePythonExpression(text) {
         .replace(/→/g, '<=')
         .replace(/∨/g, ' or ')
         .replace(/∧/g, ' and ')
-        .replace(/¬/g, ' not ');
+        .replace(/¬\s*([a-zA-Z0-9_]+|\([^)]+\))/g, '(not ($1))');
 }
 
 function solve() {
@@ -107,6 +107,8 @@ function solve() {
     const n = varNames.length;
     let fullTable = [];
     
+    const sortedVars = [...varNames].sort((a, b) => b.length - a.length);
+
     for (let i = 0; i < (1 << n); i++) {
         let env = {};
         for (let j = 0; j < n; j++) {
@@ -114,7 +116,7 @@ function solve() {
         }
         try {
             let evalExpr = exprText;
-            for (let v of varNames) {
+            for (let v of sortedVars) {
                 evalExpr = evalExpr.replace(new RegExp('\\b' + v + '\\b', 'g'), env[v]);
             }
             let fVal = eval(evalExpr) ? 1 : 0;
