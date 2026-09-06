@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Решатель 2 задания ЕГЭ по информатике</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 20px; }
+        .card { background: white; max-width: 650px; margin: 0 auto; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { color: #1a73e8; margin-top: 0; }
+        label { font-weight: bold; display: block; margin-top: 15px; }
+        input[type="text"] { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        .toolbar { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+        .sym-btn { background: #e8f0fe; color: #1967d2; border: 1px solid #aecbfa; border-radius: 6px; padding: 6px 14px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .sym-btn:hover { background: #d2e3fc; }
+        .grid { display: grid; grid-template-columns: repeat(5, 50px); gap: 8px; margin-top: 10px; }
+        .grid input { text-align: center; height: 40px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; }
+        .grid-header { font-weight: bold; text-align: center; line-height: 30px; }
+        button.action-btn { margin-top: 20px; width: 100%; padding: 12px; background: #1a73e8; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: bold; }
+        button.action-btn:hover { background: #1557b0; }
+        #result { margin-top: 20px; padding: 15px; background: #e8f0fe; border-radius: 6px; font-weight: bold; font-size: 18px; color: #1967d2; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Решатель задания №2 ЕГЭ</h2>
+    
+    <label for="expr">Логическое выражение:</label>
+    <input type="text" id="expr" value="(x ≡ ¬y) → (z ≡ (y ∨ w))">
+
+    <div class="toolbar">
+        <button class="sym-btn" onclick="insertSymbol('¬')">¬ (НЕ)</button>
+        <button class="sym-btn" onclick="insertSymbol(' ∧ ')">∧ (И)</button>
+        <button class="sym-btn" onclick="insertSymbol(' ∨ ')">∨ (ИЛИ)</button>
+        <button class="sym-btn" onclick="insertSymbol(' → ')">→</button>
+        <button class="sym-btn" onclick="insertSymbol(' ≡ ')">≡</button>
+        <button class="sym-btn" onclick="insertSymbol('(')">(</button>
+        <button class="sym-btn" onclick="insertSymbol(')')">)</button>
+    </div>
+
+    <label for="vars">Переменные (через пробел):</label>
+    <input type="text" id="vars" value="x y z w">
+
+    <label>Таблица из задания (0, 1 или -):</label>
+    <div class="grid" id="grid">
+        <div class="grid-header">C1</div><div class="grid-header">C2</div><div class="grid-header">C3</div><div class="grid-header">C4</div><div class="grid-header">F</div>
+        <!-- 3 строки по 5 ячеек -->
+        <input value="-"><input value="-"><input value="-"><input value="-"><input value="0">
+        <input value="-"><input value="-"><input value="-"><input value="-"><input value="0">
+        <input value="-"><input value="-"><input value="-"><input value="-"><input value="0">
+    </div>
+
+    <button class="action-btn" onclick="solve()">Найти ответ</button>
+
+    <div id="result">Ответ появится здесь...</div>
+</div>
+
+<script>
+function insertSymbol(sym) {
+    const exprInput = document.getElementById('expr');
+    const start = exprInput.selectionStart;
+    const end = exprInput.selectionEnd;
+    const text = exprInput.value;
+    exprInput.value = text.substring(0, start) + sym + text.substring(end);
+    exprInput.focus();
+    exprInput.setSelectionRange(start + sym.length, start + sym.length);
+}
+
+function getPermutations(arr) {
+    if (arr.length <= 1) return [arr];
+    let res = [];
+    for (let i = 0; i < arr.length; i++) {
+        let current = arr[i];
+        let remaining = arr.slice(0, i).concat(arr.slice(i + 1));
+        let permOfRemaining = getPermutations(remaining);
+        for (let perm of permOfRemaining) {
+            res.push([current].concat(perm));
+        }
+    }
+    return res;
+}
+
+function preparePythonExpression(text) {
+    return text
+        .replace(/≡/g, '==')
+        .replace(/→/g, '<=')
+        .replace(/∨/g, ' or ')
+        .replace(/∧/g, ' and ')
+        .replace(/¬/g, ' not ');
+}
+
+function solve() {
+    let rawExpr = document.getElementById('expr').value;
+    const exprText = preparePythonExpression(rawExpr);
+    const varNames = document.getElementById('vars').value.trim().split(/\s+/);
+    const inputs = document.querySelectorAll('#grid input');
+    
+    let targetRows = [];
+    for (let i = 0; i < 3; i++) {
+        let row = [];
+        for (let j = 0; j < 5; j++) {
+            row.push(inputs[i * 5 + j].value.trim());
+        }
+        targetRows.push(row);
+    }
+
+    const n = varNames.length;
+    let fullTable = [];
+    
+    for (let i = 0; i < (1 << n); i++) {
+        let env = {};
+        for (let j = 0; j < n; j++) {
+            env[varNames[j]] = (i >> (n - 1 - j)) & 1;
+        }
+        try {
+            let evalExpr = exprText;
+            for (let v of varNames) {
+                evalExpr = evalExpr.replace(new RegExp('\\b' + v + '\\b', 'g'), env[v]);
+            }
+            let fVal = eval(evalExpr) ? 1 : 0;
+            fullTable.push({...env, F: fVal});
+        } catch (e) {
+            document.getElementById('result').innerText = "Ошибка в синтаксисе выражения!";
+            return;
+        }
+    }
+
+    const perms = getPermutations(varNames);
+    let answers = [];
+
+    for (let p of perms) {
+        let matchedIndices = new Set();
+        let validPerm = true;
+
+        for (let tRow of targetRows) {
+            let foundMatch = false;
+            for (let idx = 0; idx < fullTable.length; idx++) {
+                if (matchedIndices.has(idx)) continue;
+                let ftRow = fullTable[idx];
+                
+                if (tRow[4] !== '-' && parseInt(tRow[4]) !== ftRow.F) continue;
+
+                let colMatch = true;
+                for (let c = 0; c < n; c++) {
+                    if (tRow[c] !== '-' && parseInt(tRow[c]) !== ftRow[p[c]]) {
+                        colMatch = false;
+                        break;
+                    }
+                }
+
+                if (colMatch) {
+                    foundMatch = true;
+                    matchedIndices.add(idx);
+                    break;
+                }
+            }
+            if (!foundMatch) {
+                validPerm = false;
+                break;
+            }
+        }
+
+        if (validPerm) {
+            answers.push(p.join(''));
+        }
+    }
+
+    if (answers.length > 0) {
+        document.getElementById('result').innerText = "Ответ: " + Array.from(new Set(answers)).join(" или ");
+    } else {
+        document.getElementById('result').innerText = "Решение не найдено. Проверьте введенные данные.";
+    }
+}
+</script>
+
+</body>
+</html>
