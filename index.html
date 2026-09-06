@@ -44,10 +44,10 @@
     <label>Таблица из задания (0, 1 или -):</label>
     <div class="grid" id="grid">
         <div class="grid-header">C1</div><div class="grid-header">C2</div><div class="grid-header">C3</div><div class="grid-header">C4</div><div class="grid-header">F</div>
-        <!-- 3 строки по 5 ячеек -->
-        <input value="-"><input value="-"><input value="-"><input value="-"><input value="0">
-        <input value="-"><input value="-"><input value="-"><input value="-"><input value="0">
-        <input value="-"><input value="-"><input value="-"><input value="-"><input value="0">
+        <!-- Заполненная таблица для примера -->
+        <input value="0"><input value="-"><input value="0"><input value="-"><input value="0">
+        <input value="0"><input value="0"><input value="-"><input value="-"><input value="0">
+        <input value="0"><input value="-"><input value="-"><input value="0"><input value="0">
     </div>
 
     <button class="action-btn" onclick="solve()">Найти ответ</button>
@@ -80,19 +80,26 @@ function getPermutations(arr) {
     return res;
 }
 
-// Преобразование выражения с учётом правильного приоритета импликации и эквиваленции
+// Преобразователь логических операций в эквивалентный JS-код с соблюдением приоритетов
 function prepareJSExpression(text) {
-    let expr = text
-        .replace(/≡/g, '===')
-        .replace(/∨/g, ' || ')
-        .replace(/∧/g, ' && ')
-        .replace(/¬\s*([a-zA-Z0-9_]+|\([^)]+\))/g, '!($1)');
-
-    // Замена импликации A → B на (!A || B) с разбором скобок
-    while (expr.includes('→')) {
-        expr = expr.replace(/([a-zA-Z0-9_!=()]+)\s*→\s*([a-zA-Z0-9_!=()]+)/g, '(!($1) || ($2))');
+    let s = text.replace(/\s+/g, '');
+    
+    // Эквиваленция (A === B)
+    while (s.includes('≡')) {
+        s = s.replace(/([^()≡∨∧→¬]+|\([^()]*\))≡([^()≡∨∧→¬]+|\([^()]*\))/g, '(($1)===($2))');
     }
-    return expr;
+    // Импликация (!A || B)
+    while (s.includes('→')) {
+        s = s.replace(/([^()→∨∧¬]+|\([^()]*\))→([^()→∨∧¬]+|\([^()]*\))/g, '(!($1)||($2))');
+    }
+    // ИЛИ (A || B)
+    s = s.replace(/∨/g, '||');
+    // И (A && B)
+    s = s.replace(/∧/g, '&&');
+    // НЕ (!A)
+    s = s.replace(/¬/g, '!');
+    
+    return s;
 }
 
 function solve() {
@@ -116,7 +123,7 @@ function solve() {
     }
 
     if (targetRows.length === 0) {
-        document.getElementById('result').innerText = "Заполните хотя бы одно значение в таблице!";
+        document.getElementById('result').innerText = "Заполните значения в таблице!";
         return;
     }
 
@@ -146,7 +153,7 @@ function solve() {
     const perms = getPermutations(varNames);
     let answers = [];
 
-    // Поиск совпадений через рекурсивный перебор всех комбинаций строк (без жадного застревания)
+    // Подбор строк
     for (let p of perms) {
         function matchRows(tIdx, usedFullIndices) {
             if (tIdx === targetRows.length) return true;
@@ -169,7 +176,7 @@ function solve() {
                 if (colMatch) {
                     usedFullIndices.add(idx);
                     if (matchRows(tIdx + 1, usedFullIndices)) return true;
-                    usedFullIndices.delete(idx); // откат при неудаче
+                    usedFullIndices.delete(idx);
                 }
             }
             return false;
